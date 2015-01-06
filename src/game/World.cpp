@@ -1318,11 +1318,11 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading GameTeleports...");
     sObjectMgr.LoadGameTele();
 
-    sLog.outString("Loading GM tickets...");
-    sTicketMgr.LoadGMTickets();
-
     sLog.outString( "Loading AntiCheat config..." );
     sObjectMgr.LoadAntiCheatConfig();
+
+    sLog.outString("Loading GM tickets...");
+    sTicketMgr.LoadGMTickets();
 
     ///- Handle outdated emails (delete/return)
     sLog.outString("Returning old mails...");
