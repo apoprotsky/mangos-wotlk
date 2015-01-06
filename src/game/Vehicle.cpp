@@ -51,9 +51,6 @@ void ObjectMgr::LoadVehicleAccessory()
 {
     sVehicleAccessoryStorage.Load();
 
-    sLog.outString(">> Loaded %u vehicle accessories", sVehicleAccessoryStorage.GetRecordCount());
-    sLog.outString();
-
     // Check content
     for (SQLMultiStorage::SQLSIterator<VehicleAccessory> itr = sVehicleAccessoryStorage.getDataBegin<VehicleAccessory>(); itr < sVehicleAccessoryStorage.getDataEnd<VehicleAccessory>(); ++itr)
     {
@@ -76,6 +73,9 @@ void ObjectMgr::LoadVehicleAccessory()
             continue;
         }
     }
+
+    sLog.outString(">> Loaded %u vehicle accessories", sVehicleAccessoryStorage.GetRecordCount());
+    sLog.outString();
 }
 
 /**
@@ -109,7 +109,7 @@ VehicleInfo::VehicleInfo(Unit* owner, VehicleEntry const* vehicleEntry, uint32 o
                 if (IsUsableSeatForCreature(seatEntry->m_flags))
                     m_creatureSeats |= 1 << i;
 
-                if (IsUsableSeatForPlayer(seatEntry->m_flags))
+                if (IsUsableSeatForPlayer(seatEntry->m_flags, seatEntry->m_flagsB))
                     m_playerSeats |= 1 << i;
             }
         }
@@ -140,6 +140,29 @@ void VehicleInfo::Initialize()
             summoned->CastCustomSpell((Unit*)m_owner, SPELL_RIDE_VEHICLE_HARDCODED, &basepoint0, NULL, NULL, true);
         }
     }
+
+    // Initialize movement limitations
+    uint32 vehicleFlags = GetVehicleEntry()->m_flags;
+    Unit* pVehicle = (Unit*)m_owner;
+
+    if (vehicleFlags & VEHICLE_FLAG_NO_STRAFE)
+        pVehicle->m_movementInfo.AddMovementFlags2(MOVEFLAG2_NO_STRAFE);
+    if (vehicleFlags & VEHICLE_FLAG_NO_JUMPING)
+        pVehicle->m_movementInfo.AddMovementFlags2(MOVEFLAG2_NO_JUMPING);
+    if (vehicleFlags & VEHICLE_FLAG_FULLSPEEDTURNING)
+        pVehicle->m_movementInfo.AddMovementFlags2(MOVEFLAG2_FULLSPEEDTURNING);
+    if (vehicleFlags & VEHICLE_FLAG_ALLOW_PITCHING)
+        pVehicle->m_movementInfo.AddMovementFlags2(MOVEFLAG2_ALLOW_PITCHING);
+    if (vehicleFlags & VEHICLE_FLAG_FULLSPEEDPITCHING)
+        pVehicle->m_movementInfo.AddMovementFlags2(MOVEFLAG2_FULLSPEEDPITCHING);
+
+    // Initialize power type based on DBC values (creatures only)
+    if (pVehicle->GetTypeId() == TYPEID_UNIT)
+    {
+        if (PowerDisplayEntry const* powerEntry = sPowerDisplayStore.LookupEntry(GetVehicleEntry()->m_powerDisplayID))
+            pVehicle->SetPowerType(Powers(powerEntry->power));
+    }
+
     m_isInitialized = true;
 }
 
@@ -300,6 +323,7 @@ void VehicleInfo::UnBoard(Unit* passenger, bool changeVehicle)
         {
             Player* pPlayer = (Player*)passenger;
             pPlayer->ResummonPetTemporaryUnSummonedIfAny();
+            pPlayer->SetFallInformation(0, pPlayer->GetPositionZ());
 
             // SMSG_PET_DISMISS_SOUND (?)
         }
@@ -469,9 +493,13 @@ uint8 VehicleInfo::GetTakenSeatsMask() const
     return takenSeatsMask;
 }
 
-bool VehicleInfo:: IsUsableSeatForPlayer(uint32 seatFlags) const
+bool VehicleInfo::IsUsableSeatForPlayer(uint32 seatFlags, uint32 seatFlagsB) const
 {
-    return seatFlags & SEAT_FLAG_USABLE;
+    return seatFlags & SEAT_FLAG_CAN_EXIT ||
+           seatFlags & SEAT_FLAG_UNCONTROLLED ||
+           seatFlagsB &
+           (SEAT_FLAG_B_USABLE_FORCED   | SEAT_FLAG_B_USABLE_FORCED_2 |
+            SEAT_FLAG_B_USABLE_FORCED_3 | SEAT_FLAG_B_USABLE_FORCED_4);
 }
 
 /// Add control and such modifiers to a passenger if required
@@ -479,9 +507,16 @@ void VehicleInfo::ApplySeatMods(Unit* passenger, uint32 seatFlags)
 {
     Unit* pVehicle = (Unit*)m_owner;                        // Vehicles are alawys Unit
 
+    if (seatFlags & SEAT_FLAG_NOT_SELECTABLE)
+        passenger->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+
     if (passenger->GetTypeId() == TYPEID_PLAYER)
     {
         Player* pPlayer = (Player*)passenger;
+
+        // group update
+        if (pPlayer->GetGroup())
+            pPlayer->SetGroupUpdateFlag(GROUP_UPDATE_FLAG_VEHICLE_SEAT);
 
         if (seatFlags & SEAT_FLAG_CAN_CONTROL)
         {
@@ -510,7 +545,7 @@ void VehicleInfo::ApplySeatMods(Unit* passenger, uint32 seatFlags)
             }
         }
 
-        if (seatFlags & (SEAT_FLAG_USABLE | SEAT_FLAG_CAN_CAST))
+        if (seatFlags & SEAT_FLAG_CAN_CAST)
         {
             CharmInfo* charmInfo = pVehicle->InitCharmInfo(pVehicle);
             charmInfo->InitVehicleCreateSpells();
@@ -539,9 +574,16 @@ void VehicleInfo::RemoveSeatMods(Unit* passenger, uint32 seatFlags)
 {
     Unit* pVehicle = (Unit*)m_owner;
 
+    if (seatFlags & SEAT_FLAG_NOT_SELECTABLE)
+        passenger->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+
     if (passenger->GetTypeId() == TYPEID_PLAYER)
     {
         Player* pPlayer = (Player*)passenger;
+
+        // group update
+        if (pPlayer->GetGroup())
+            pPlayer->SetGroupUpdateFlag(GROUP_UPDATE_FLAG_VEHICLE_SEAT);
 
         if (seatFlags & SEAT_FLAG_CAN_CONTROL)
         {
@@ -558,7 +600,7 @@ void VehicleInfo::RemoveSeatMods(Unit* passenger, uint32 seatFlags)
             pPlayer->GetCamera().ResetView();
         }
 
-        if (seatFlags & (SEAT_FLAG_USABLE | SEAT_FLAG_CAN_CAST))
+        if (seatFlags & SEAT_FLAG_CAN_CAST)
             pPlayer->RemovePetActionBar();
     }
     else if (passenger->GetTypeId() == TYPEID_UNIT)
@@ -568,6 +610,7 @@ void VehicleInfo::RemoveSeatMods(Unit* passenger, uint32 seatFlags)
             passenger->SetCharm(NULL);
             pVehicle->SetCharmerGuid(ObjectGuid());
         }
+
         // Reinitialize movement
         ((Creature*)passenger)->AI()->SetCombatMovement(true, true);
         if (!passenger->getVictim())

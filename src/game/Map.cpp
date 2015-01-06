@@ -39,6 +39,7 @@
 #include "BattleGround/BattleGroundMgr.h"
 #include "Calendar.h"
 #include "Chat.h"
+#include "Weather.h"
 
 Map::~Map()
 {
@@ -59,6 +60,9 @@ Map::~Map()
     // release reference count
     if (m_TerrainData->Release())
         sTerrainMgr.UnloadTerrain(m_TerrainData->GetMapId());
+
+    delete m_weatherSystem;
+    m_weatherSystem = NULL;
 }
 
 void Map::LoadMapAndVMap(int gx, int gy)
@@ -99,6 +103,8 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
 
     m_persistentState = sMapPersistentStateMgr.AddPersistentState(i_mapEntry, GetInstanceId(), GetDifficulty(), 0, IsDungeon());
     m_persistentState->SetUsedByMapState(this);
+
+    m_weatherSystem = new WeatherSystem(this);
 }
 
 void Map::InitVisibilityDistance()
@@ -275,12 +281,15 @@ bool Map::EnsureGridLoaded(const Cell& cell)
     return false;
 }
 
-void Map::LoadGrid(const Cell& cell, bool no_unload)
+void Map::ForceLoadGrid(float x, float y)
 {
-    EnsureGridLoaded(cell);
-
-    if (no_unload)
+    if (!IsLoaded(x, y))
+    {
+        CellPair p = MaNGOS::ComputeCellPair(x, y);
+        Cell cell(p);
+        EnsureGridLoadedAtEnter(cell);
         getNGrid(cell.GridX(), cell.GridY())->setUnloadExplicitLock(true);
+    }
 }
 
 bool Map::Add(Player* player)
@@ -565,6 +574,8 @@ void Map::Update(const uint32& t_diff)
 
     if (i_data)
         i_data->Update(t_diff);
+
+    m_weatherSystem->UpdateWeathers(t_diff);
 }
 
 void Map::Remove(Player* player, bool remove)
@@ -704,7 +715,6 @@ void Map::CreatureRelocation(Creature* creature, float x, float y, float z, floa
 {
     MANGOS_ASSERT(CheckGridIntegrity(creature, false));
 
-    Cell old_cell = creature->GetCurrentCell();
     Cell new_cell(MaNGOS::ComputeCellPair(x, y));
 
     // do move or do move to respawn or remove creature if previous all fail
@@ -725,7 +735,7 @@ void Map::CreatureRelocation(Creature* creature, float x, float y, float z, floa
     MANGOS_ASSERT(CheckGridIntegrity(creature, true));
 }
 
-bool Map::CreatureCellRelocation(Creature* c, Cell new_cell)
+bool Map::CreatureCellRelocation(Creature* c, const Cell &new_cell)
 {
     Cell const& old_cell = c->GetCurrentCell();
     if (old_cell.DiffGrid(new_cell))
@@ -1043,6 +1053,20 @@ void Map::SendToPlayers(WorldPacket const* data) const
         itr->getSource()->GetSession()->SendPacket(data);
 }
 
+bool Map::SendToPlayersInZone(WorldPacket const* data, uint32 zoneId) const
+{
+    bool foundPlayer = false;
+    for (MapRefManager::const_iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
+    {
+        if (itr->getSource()->GetZoneId() == zoneId)
+        {
+            itr->getSource()->GetSession()->SendPacket(data);
+            foundPlayer = true;
+        }
+    }
+    return foundPlayer;
+}
+
 bool Map::ActiveObjectsNearGrid(uint32 x, uint32 y) const
 {
     MANGOS_ASSERT(x < MAX_NUMBER_OF_GRIDS);
@@ -1202,6 +1226,38 @@ void Map::CreateInstanceData(bool load)
         DEBUG_LOG("New instance data, \"%s\" ,initialized!", sScriptMgr.GetScriptName(i_script_id));
         i_data->Initialize();
     }
+}
+
+void Map::TeleportAllPlayersTo(TeleportLocation loc)
+{
+    while (HavePlayers())
+    {
+        if (Player* plr = m_mapRefManager.getFirst()->getSource())
+        {
+            // Teleport to specified location and removes the player from this map (if the map exists).
+            // Todo : we can add some specific location if needed (ex: map exit location for dungeon)
+            switch (loc)
+            {
+                case TELEPORT_LOCATION_HOMEBIND:
+                    plr->TeleportToHomebind();
+                    break;
+                case TELEPORT_LOCATION_BG_ENTRY_POINT:
+                    plr->TeleportToBGEntryPoint();
+                    break;
+                default:
+                    break;
+            }
+            // just in case, remove the player from the list explicitly here as well to prevent a possible infinite loop
+            // note that this remove is not needed if the code works well in other places
+            plr->GetMapRef().unlink();
+        }
+    }
+}
+
+void Map::SetWeather(uint32 zoneId, WeatherType type, float grade, bool permanently)
+{
+    Weather* wth = m_weatherSystem->FindOrCreateWeather(zoneId);
+    wth->SetWeather(WeatherType(type), grade, this, permanently);
 }
 
 template void Map::Add(Corpse*);
@@ -1452,15 +1508,7 @@ void DungeonMap::PermBindAllPlayers(Player* player)
 
 void DungeonMap::UnloadAll(bool pForce)
 {
-    if (HavePlayers())
-    {
-        sLog.outError("DungeonMap::UnloadAll: there are still players in the instance at unload, should not happen!");
-        for (MapRefManager::iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
-        {
-            Player* plr = itr->getSource();
-            plr->TeleportToHomebind();
-        }
-    }
+    TeleportAllPlayersTo(TELEPORT_LOCATION_HOMEBIND);
 
     if (m_resetAfterUnload == true)
         GetPersistanceState()->DeleteRespawnTimes();
@@ -1555,17 +1603,7 @@ void BattleGroundMap::SetUnload()
 
 void BattleGroundMap::UnloadAll(bool pForce)
 {
-    while (HavePlayers())
-    {
-        if (Player* plr = m_mapRefManager.getFirst()->getSource())
-        {
-            plr->TeleportTo(plr->GetBattleGroundEntryPoint());
-            // TeleportTo removes the player from this map (if the map exists) -> calls BattleGroundMap::Remove -> invalidates the iterator.
-            // just in case, remove the player from the list explicitly here as well to prevent a possible infinite loop
-            // note that this remove is not needed if the code works well in other places
-            plr->GetMapRef().unlink();
-        }
-    }
+    TeleportAllPlayersTo(TELEPORT_LOCATION_BG_ENTRY_POINT);
 
     Map::UnloadAll(pForce);
 }

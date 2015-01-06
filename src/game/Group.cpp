@@ -479,7 +479,7 @@ void Group::Disband(bool hideDestroy)
     }
 
     m_leaderGuid.Clear();
-    m_leaderName = "";
+    m_leaderName.clear();
 }
 
 /*********************************************************/
@@ -1575,7 +1575,7 @@ void Group::UpdateLooterGuid(WorldObject* pSource, bool ifneed)
     SendUpdate();
 }
 
-GroupJoinBattlegroundResult Group::CanJoinBattleGroundQueue(BattleGround const* bgOrTemplate, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot)
+GroupJoinBattlegroundResult Group::CanJoinBattleGroundQueue(BattleGround const* bgOrTemplate, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 /*MaxPlayerCount*/, bool isRated, uint32 arenaSlot)
 {
     BattlemasterListEntry const* bgEntry = sBattlemasterListStore.LookupEntry(bgOrTemplate->GetTypeID());
     if (!bgEntry)

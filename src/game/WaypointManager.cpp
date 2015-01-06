@@ -60,36 +60,33 @@ void WaypointManager::Load()
     for (ScriptMapMap::const_iterator itr = sCreatureMovementScripts.second.begin(); itr != sCreatureMovementScripts.second.end(); ++itr)
         movementScriptSet.insert(itr->first);
 
+    // /////////////////////////////////////////////////////
     // creature_movement
+    // /////////////////////////////////////////////////////
+
     QueryResult* result = WorldDatabase.Query("SELECT id, COUNT(point) FROM creature_movement GROUP BY id");
 
     if (!result)
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 paths. DB table `creature_movement` is empty.");
+        sLog.outString();
     }
     else
     {
         total_paths = (uint32)result->GetRowCount();
-        BarGoLink bar(total_paths);
 
-        do
+        do                                                  // Count expected amount of nodes
         {
-            bar.step();
             Field* fields   = result->Fetch();
 
-            uint32 id       = fields[0].GetUInt32();
+            // uint32 id    = fields[0].GetUInt32();
             uint32 count    = fields[1].GetUInt32();
 
             total_nodes += count;
         }
         while (result->NextRow());
-
-        sLog.outString();
-        sLog.outString(">> Paths loaded");
-
         delete result;
 
         //                                   0   1      2           3           4           5         6
@@ -97,15 +94,16 @@ void WaypointManager::Load()
                                      //   7        8        9        10       11       12     13     14           15      16
                                      "textid1, textid2, textid3, textid4, textid5, emote, spell, orientation, model1, model2 FROM creature_movement");
 
-        BarGoLink barRow((int)result->GetRowCount());
+        BarGoLink bar(result->GetRowCount());
 
         // error after load, we check if creature guid corresponding to the path id has proper MovementType
         std::set<uint32> creatureNoMoveType;
 
         do
         {
-            barRow.step();
+            bar.step();
             Field* fields = result->Fetch();
+
             uint32 id           = fields[0].GetUInt32();
             uint32 point        = fields[1].GetUInt32();
 
@@ -216,54 +214,49 @@ void WaypointManager::Load()
                 const CreatureData* cData = sObjectMgr.GetCreatureData(*itr);
                 const CreatureInfo* cInfo = ObjectMgr::GetCreatureTemplate(cData->id);
 
-                sLog.outErrorDb("Table creature_movement has waypoint for creature guid %u (entry %u), but MovementType is not WAYPOINT_MOTION_TYPE(2). Creature will not use this path.", *itr, cData->id);
+                ERROR_DB_STRICT_LOG("Table creature_movement has waypoint for creature guid %u (entry %u), but MovementType is not WAYPOINT_MOTION_TYPE(2). Make sure that this is actually used in a script!", *itr, cData->id);
 
                 if (cInfo->MovementType == WAYPOINT_MOTION_TYPE)
                     sLog.outErrorDb("    creature_template for this entry has MovementType WAYPOINT_MOTION_TYPE(2), did you intend to use creature_movement_template ?");
             }
         }
 
+        sLog.outString(">> Loaded %u paths, %u nodes and %u behaviors from waypoints", total_paths, total_nodes, total_behaviors);
         sLog.outString();
-        sLog.outString(">> Waypoints and behaviors loaded");
-        sLog.outString();
-        sLog.outString(">>> Loaded %u paths, %u nodes and %u behaviors", total_paths, total_nodes, total_behaviors);
 
         delete result;
     }
 
+    // /////////////////////////////////////////////////////
     // creature_movement_template
+    // /////////////////////////////////////////////////////
+
     result = WorldDatabase.Query("SELECT entry, COUNT(point) FROM creature_movement_template GROUP BY entry");
 
     if (!result)
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 path templates. DB table `creature_movement_template` is empty.");
+        sLog.outString();
     }
     else
     {
         total_nodes = 0;
         total_behaviors = 0;
         total_paths = (uint32)result->GetRowCount();
-        BarGoLink barRow(total_paths);
 
-        do
+        do                                                  // Count expected amount of nodes
         {
-            barRow.step();
             Field* fields = result->Fetch();
 
-            uint32 entry    = fields[0].GetUInt32();
+            // uint32 entry = fields[0].GetUInt32();
             uint32 count    = fields[1].GetUInt32();
 
             total_nodes += count;
         }
         while (result->NextRow());
-
         delete result;
-
-        sLog.outString();
-        sLog.outString(">> Path templates loaded");
 
         //                                   0      1      2           3           4           5         6
         result = WorldDatabase.Query("SELECT entry, point, position_x, position_y, position_z, waittime, script_id,"
@@ -369,16 +362,15 @@ void WaypointManager::Load()
 
         delete result;
 
+        sLog.outString(">> Loaded %u path templates with %u nodes and %u behaviors from waypoint templates", total_paths, total_nodes, total_behaviors);
         sLog.outString();
-        sLog.outString(">> Waypoint templates loaded");
-        sLog.outString();
-        sLog.outString(">>> Loaded %u path templates with %u nodes and %u behaviors", total_paths, total_nodes, total_behaviors);
     }
 
     if (!movementScriptSet.empty())
     {
         for (std::set<uint32>::const_iterator itr = movementScriptSet.begin(); itr != movementScriptSet.end(); ++itr)
             sLog.outErrorDb("Table `dbscripts_on_creature_movement` contain unused script, id %u.", *itr);
+        sLog.outString();
     }
 }
 

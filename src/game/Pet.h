@@ -178,7 +178,6 @@ class MANGOS_DLL_SPEC Pet : public Creature
         }
 
         void RegenerateAll(uint32 update_diff) override;    // overwrite Creature::RegenerateAll
-        void Regenerate(Powers power);
         void LooseHappiness();
         HappinessState GetHappinessState();
         void GivePetXP(uint32 xp);
@@ -211,6 +210,7 @@ class MANGOS_DLL_SPEC Pet : public Creature
 
         void LearnPetPassives();
         void CastPetAuras(bool current);
+        void CastOwnerTalentAuras();
         void CastPetAura(PetAura const* aura);
 
         void _LoadSpellCooldowns();

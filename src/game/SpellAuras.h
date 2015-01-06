@@ -408,6 +408,10 @@ class MANGOS_DLL_SPEC Aura
         void HandleAuraAddMechanicAbilities(bool apply, bool Real);
         void HandleAuraStopNaturalManaRegen(bool apply, bool Real);
         void HandleAuraSetVehicleId(bool apply, bool Real);
+        void HandleMirrorName(bool apply, bool Real);
+        void HandlePreventResurrection(bool apply, bool Real);
+        void HandleFactionOverride(bool apply, bool Real);
+        void HandleTriggerLinkedAura(bool apply, bool Real);
 
         virtual ~Aura();
 
@@ -527,13 +531,14 @@ class MANGOS_DLL_SPEC Aura
 class MANGOS_DLL_SPEC AreaAura : public Aura
 {
     public:
-        AreaAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32* currentBasePoints, SpellAuraHolder* holder, Unit* target, Unit* caster = NULL, Item* castItem = NULL);
+        AreaAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32* currentBasePoints, SpellAuraHolder* holder, Unit* target, Unit* caster = NULL, Item* castItem = NULL, uint32 originalRankSpellId = 0);
         ~AreaAura();
     protected:
         void Update(uint32 diff) override;
     private:
         float m_radius;
         AreaAuraType m_areaAuraType;
+        uint32       m_originalRankSpellId;
 };
 
 class MANGOS_DLL_SPEC PersistentAreaAura : public Aura

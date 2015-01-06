@@ -716,7 +716,7 @@ struct CinematicSequencesEntry
 struct CreatureDisplayInfoEntry
 {
     uint32      Displayid;                                  // 0        m_ID
-    // 1        m_modelID
+    uint32      ModelId;
     // 2        m_soundID
     uint32      ExtendedDisplayInfoID;                      // 3        m_extendedDisplayInfoID -> CreatureDisplayInfoExtraEntry::DisplayExtraId
     float       scale;                                      // 4        m_creatureModelScale
@@ -729,6 +729,28 @@ struct CreatureDisplayInfoEntry
     // 13       m_particleColorID
     // 14       m_creatureGeosetData
     // 15       m_objectEffectPackageID
+};
+
+struct CreatureModelDataEntry
+{
+    uint32      Id;
+    uint32      Flags;
+    // char*    ModelPath[16]
+    // uint32   Unk1;
+    float       Scale;                                      // Used in calculation of unit collision data
+    // int32    Unk2
+    // int32    Unk3
+    // uint32   Unk4
+    // uint32   Unk5
+    // float    Unk6
+    // uint32   Unk7
+    // float    Unk8
+    // uint32   Unk9
+    // uint32   Unk10
+    // float    CollisionWidth;
+    float       CollisionHeight;
+    float       MountHeight;                                // Used in calculation of unit collision data when mounted
+    // float Unks[11]
 };
 
 struct CreatureDisplayInfoExtraEntry
@@ -1342,6 +1364,16 @@ struct OverrideSpellDataEntry
     uint32      Id;                                         // 0        m_ID
     uint32      Spells[MAX_OVERRIDE_SPELLS];                // 1-10     m_spells
     // uint32      unk2;                                    // 11       m_flags
+};
+
+struct PowerDisplayEntry
+{
+    uint32      id;                                         // 0        m_ID
+    uint32      power;                                      // 1        m_power
+    // uint32   unk1                                        // 2
+    // float    unk2                                        // 3
+    // float    unk3                                        // 4
+    // float    unk4                                        // 5
 };
 
 struct PvPDifficultyEntry
@@ -2007,7 +2039,7 @@ struct VehicleEntry
     uint32  m_uiLocomotionType;                             // 34
     float   m_msslTrgtImpactTexRadius;                      // 35
     uint32  m_uiSeatIndicatorType;                          // 36       m_vehicleUIIndicatorID
-    // 37       m_powerDisplayID
+    uint32  m_powerDisplayID;                               // 37
     // 38 new in 3.1
     // 39 new in 3.1
 };

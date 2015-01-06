@@ -191,7 +191,7 @@ class CalendarInvite
 {
     public:
 
-        CalendarInvite() : m_calendarEvent(NULL), InviteId(0), LastUpdateTime(time(NULL)), Status(CALENDAR_STATUS_INVITED), Rank(CALENDAR_RANK_PLAYER) {}
+        CalendarInvite() : InviteId(0), LastUpdateTime(time(NULL)), Status(CALENDAR_STATUS_INVITED), Rank(CALENDAR_RANK_PLAYER), m_calendarEvent(NULL) {}
 
         CalendarInvite(CalendarEvent* event, uint64 inviteId, ObjectGuid senderGuid, ObjectGuid inviteeGuid, time_t statusTime,
                        CalendarInviteStatus status, CalendarModerationRank rank, std::string text);
@@ -228,7 +228,7 @@ class CalendarMgr
         CalendarEvent* AddEvent(ObjectGuid const& guid, std::string title, std::string description, uint32 type, uint32 repeatable, uint32 maxInvites,
                                 int32 dungeonId, time_t eventTime, time_t unkTime, uint32 flags);
 
-        CalendarInvite* AddInvite(CalendarEvent* event, ObjectGuid const& senderGuid, ObjectGuid const& inviteeGuid, CalendarInviteStatus status, CalendarModerationRank rank, std::string text, time_t statusTime);
+        CalendarInvite* AddInvite(CalendarEvent* event, ObjectGuid const& senderGuid, ObjectGuid const& inviteeGuid, CalendarInviteStatus status, CalendarModerationRank rank, const std::string &text, time_t statusTime);
 
         void RemoveEvent(uint64 eventId, Player* remover);
         bool RemoveInvite(uint64 eventId, uint64 inviteId, ObjectGuid const& removerGuid);

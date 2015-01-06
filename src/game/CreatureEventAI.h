@@ -64,6 +64,7 @@ enum EventAI_Type
     EVENT_T_TARGET_MISSING_AURA     = 28,                   // Param1 = SpellID, Param2 = Number of time stacked expected, Param3/4 Repeat Min/Max
     EVENT_T_TIMER_GENERIC           = 29,                   // InitialMin, InitialMax, RepeatMin, RepeatMax
     EVENT_T_RECEIVE_AI_EVENT        = 30,                   // AIEventType, Sender-Entry, unused, unused
+    EVENT_T_ENERGY                  = 31,                   // EnergyMax%, EnergyMin%, RepeatMin, RepeatMax
 
     EVENT_T_END,
 };
@@ -117,6 +118,8 @@ enum EventAI_ActionType
     ACTION_T_CHANCED_TEXT               = 44,               // Chance to display the text, TextId1, optionally TextId2. If more than just -TextId1 is defined, randomize. Negative values.
     ACTION_T_THROW_AI_EVENT             = 45,               // EventType, Radius, unused
     ACTION_T_SET_THROW_MASK             = 46,               // EventTypeMask, unused, unused
+    ACTION_T_SET_STAND_STATE            = 47,               // StandState, unused, unused
+    ACTION_T_CHANGE_MOVEMENT            = 48,               // MovementType, WanderDistance, unused
 
     ACTION_T_END,
 };
@@ -397,6 +400,20 @@ struct CreatureEventAI_Action
             uint32 unused1;
             uint32 unused2;
         } setThrowMask;
+        // ACTION_T_SET_STAND_STATE                         = 47
+        struct
+        {
+            uint32 standState;
+            uint32 unused1;
+            uint32 unused2;
+        } setStandState;
+        // ACTION_T_CHANGE_MOVEMENT                         = 48
+        struct
+        {
+            uint32 movementType;
+            uint32 wanderDistance;
+            uint32 unused1;
+        } changeMovement;
         // RAW
         struct
         {
@@ -435,6 +452,7 @@ struct CreatureEventAI_Event
         // EVENT_T_MANA                                     = 3
         // EVENT_T_TARGET_HP                                = 12
         // EVENT_T_TARGET_MANA                              = 18
+        // EVENT_T_ENERGY                                   = 31
         struct
         {
             uint32 percentMax;
@@ -651,6 +669,7 @@ class MANGOS_DLL_SPEC CreatureEventAI : public CreatureAI
 
         uint8  m_Phase;                                     // Current phase, max 32 phases
         bool   m_MeleeEnabled;                              // If we allow melee auto attack
+        bool   m_HasOOCLoSEvent;                            // Cache if a OOC-LoS Event exists
         uint32 m_InvinceabilityHpLevel;                     // Minimal health level allowed at damage apply
 
         uint32 m_throwAIEventMask;                          // Automatically throw AIEvents that are encoded into this mask

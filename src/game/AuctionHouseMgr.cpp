@@ -270,7 +270,6 @@ void AuctionHouseMgr::LoadAuctionItems()
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 auction items");
         return;
     }
@@ -310,8 +309,8 @@ void AuctionHouseMgr::LoadAuctionItems()
     while (result->NextRow());
     delete result;
 
-    sLog.outString();
     sLog.outString(">> Loaded %u auction items", count);
+    sLog.outString();
 }
 
 void AuctionHouseMgr::LoadAuctions()
@@ -321,7 +320,6 @@ void AuctionHouseMgr::LoadAuctions()
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 auctions. DB table `auction` is empty.");
         return;
     }
@@ -334,7 +332,6 @@ void AuctionHouseMgr::LoadAuctions()
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 auctions. DB table `auction` is empty.");
         return;
     }
@@ -344,7 +341,6 @@ void AuctionHouseMgr::LoadAuctions()
     {
         BarGoLink bar(1);
         bar.step();
-        sLog.outString();
         sLog.outString(">> Loaded 0 auctions. DB table `auction` is empty.");
         return;
     }
@@ -459,8 +455,8 @@ void AuctionHouseMgr::LoadAuctions()
     while (result->NextRow());
     delete result;
 
-    sLog.outString();
     sLog.outString(">> Loaded %u auctions", AuctionCount);
+    sLog.outString();
 }
 
 void AuctionHouseMgr::AddAItem(Item* it)
@@ -832,8 +828,20 @@ void WorldSession::BuildListAuctionItems(std::vector<AuctionEntry*> const& aucti
             if (levelmin != 0x00 && (proto->RequiredLevel < levelmin || (levelmax != 0x00 && proto->RequiredLevel > levelmax)))
                 continue;
 
-            if (usable != 0x00 && _player->CanUseItem(item) != EQUIP_ERR_OK)
-                continue;
+            if (usable != 0x00)
+            {
+                if (_player->CanUseItem(item) != EQUIP_ERR_OK)
+                    continue;
+
+                if (proto->Class == ITEM_CLASS_RECIPE)
+                {
+                    if (SpellEntry const* spell = sSpellStore.LookupEntry(proto->Spells[0].SpellId))
+                    {
+                        if (_player->HasSpell(spell->EffectTriggerSpell[EFFECT_INDEX_0]))
+                            continue;
+                    }
+                }
+            }
 
             std::string name = proto->Name1;
             sObjectMgr.GetItemLocaleStrings(proto->ItemId, loc_idx, &name);
